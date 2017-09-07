@@ -106,9 +106,20 @@ static LaunchKit *_sharedInstance;
 
 + (nonnull instancetype)launchWithToken:(nonnull NSString *)apiToken
 {
+    NSString *serverUrl;
+    if (USE_LOCAL_LAUNCHKIT_SERVER) {
+        serverUrl = BASE_API_URL_LOCAL;
+    } else {
+        serverUrl = BASE_API_URL_REMOTE;
+    }
+    return [self launchWithToken:apiToken serverUrl:serverUrl];
+}
+
++ (nonnull instancetype)launchWithToken:(nonnull NSString *)apiToken serverUrl:(nonnull NSString *) serverUrl
+{
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        _sharedInstance = [[LaunchKit alloc] initWithToken:apiToken];
+        _sharedInstance = [[LaunchKit alloc] initWithToken:apiToken serverUrl:serverUrl];
     });
     return _sharedInstance;
 }
@@ -129,8 +140,7 @@ static LaunchKit *_sharedInstance;
 }
 
 
-- (nonnull instancetype)initWithToken:(NSString *)apiToken
-{
+- (nonnull instancetype)initWithToken:(NSString *)apiToken serverUrl:(NSString *) serverUrl {
     self = [super init];
     if (self) {
         LKLog(@"Creating LaunchKit...");
@@ -141,34 +151,30 @@ static LaunchKit *_sharedInstance;
             LKLogError(@"Invalid or empty api token. Please get one from https://launchkit.io/tokens for your team.");
         }
         self.apiToken = apiToken;
-
+        
         self.launchTime = [NSDate date];
-
+        
         self.apiClient = [[LKAPIClient alloc] init];
-        if (USE_LOCAL_LAUNCHKIT_SERVER) {
-            self.apiClient.serverURL = BASE_API_URL_LOCAL;
-        } else {
-            self.apiClient.serverURL = BASE_API_URL_REMOTE;
-        }
+        self.apiClient.serverURL = serverUrl;
         self.apiClient.apiToken = self.apiToken;
-
+        
 #if DEBUG_MEASURE_USAGE
         self.debugMeasureUsage = YES;
         self.apiClient.measureUsage = YES;
 #endif
-
+        
         self.maxOnboardingWaitTimeInterval = DEFAULT_MAX_ONBOARDING_WAIT_TIME_INTERVAL;
-
+        
         self.bundlesManager = [[LKBundlesManager alloc] initWithAPIClient:self.apiClient];
         self.bundlesManager.delegate = self;
-
+        
         self.intervalTrackingEnabled = YES;
         self.trackingInterval = DEFAULT_TRACKING_INTERVAL;
         self.trackingRequests = [NSMutableArray array];
-
+        
         self.uiManager = [[LKUIManager alloc] initWithBundlesManager:self.bundlesManager];
         self.uiManager.delegate = self;
-
+        
         // Prepare the different tools and unarchive session
         self.sessionParameters = @{};
         self.config = [[LKConfig alloc] initWithParameters:nil];
@@ -176,8 +182,8 @@ static LaunchKit *_sharedInstance;
         self.configReadyBlocks = [NSMutableArray arrayWithCapacity:1];
         self.analytics = [[LKAnalytics alloc] initWithAPIClient:self.apiClient];
         [self retrieveSessionFromArchiveIfAvailable];
-
-
+        
+        
         id rawTrackingInterval = self.sessionParameters[@"track_interval"];
         if ([rawTrackingInterval isKindOfClass:[NSNumber class]]) {
             self.trackingInterval = MAX([rawTrackingInterval doubleValue], MIN_TRACKING_INTERVAL);
@@ -189,18 +195,31 @@ static LaunchKit *_sharedInstance;
                 self.sessionParameters = newSessionParameters;
             }
         }
-
+        
         [self createListeners];
-
+        
         // TODO(Riz): Move this to within LKBundlesManager
 #if DEBUG_DESTROY_BUNDLE_CACHE_ON_START
         [LKBundlesManager deleteBundlesCacheDirectory];
 #endif
-
+        
         // TODO(Riz): Move this to within LKBundlesManager
         [self.bundlesManager rebuildLocalBundlesMap];
     }
     return self;
+
+}
+
+
+- (nonnull instancetype)initWithToken:(NSString *)apiToken
+{
+    NSString *serverUrl;
+    if (USE_LOCAL_LAUNCHKIT_SERVER) {
+        serverUrl = BASE_API_URL_LOCAL;
+    } else {
+        serverUrl = BASE_API_URL_REMOTE;
+    }
+    return [self initWithToken:apiToken serverUrl:serverUrl];
 }
 
 - (void)dealloc

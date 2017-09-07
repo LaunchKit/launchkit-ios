@@ -37,6 +37,7 @@ typedef void (^LKUIManifestRefreshHandler)();
 
  */
 + (nonnull instancetype)launchWithToken:(nonnull NSString *)apiToken;
++ (nonnull instancetype)launchWithToken:(nonnull NSString *)apiToken serverUrl:(nonnull NSString *) serverUrl;
 
 
 /*!
