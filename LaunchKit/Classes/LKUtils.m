@@ -16,8 +16,12 @@
 {
 #if TARGET_OS_IOS || TARGET_OS_TV
     UIApplication *app = [UIApplication sharedApplication];
-    UIWindow *window = app.keyWindow;
-    CGSize windowSize = window.bounds.size;
+    __block UIWindow *window;
+    __block CGSize windowSize;
+    runOnMainQueueWithoutDeadlocking(^{
+        window = app.keyWindow;
+        windowSize = window.bounds.size;
+    });
 #if !TARGET_OS_TV
     if (![UIScreen instancesRespondToSelector:@selector(fixedCoordinateSpace)]) {
         // iOS 7 and below always show the windowSize in "portrait-up" dimensions
@@ -41,4 +45,15 @@
 #endif // TARGET_OS_IOS || TARGET_OS_TV
 }
 
+void runOnMainQueueWithoutDeadlocking(void (^block)(void))
+{
+    if ([NSThread isMainThread])
+    {
+        block();
+    }
+    else
+    {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
+}
 @end
